@@ -37,7 +37,35 @@ def register_worker():
 def update_worker():
     return 'Update: name is ' + request.form['name'] + '\n'
 
+file_suffix_to_mimetype = {
+    '.css': 'text/css',
+    '.jpg': 'image/jpeg',
+    '.html': 'text/html',
+    '.ico': 'image/x-icon',
+    '.png': 'image/png',
+    '.js': 'application/javascript'
+}
+
+@app.route('/<path:path>')
+def static_serve(path):
+    import flask
+    path = 'public/' + path
+    if not app.debug:
+        flask.abort(404)
+    try:
+        f = open(path)
+    except IOError:
+        flask.abort(404)
+        return
+    root, ext = splitext(path)
+    if ext in file_suffix_to_mimetype:
+        return flask.Response(f.read(), mimetype=file_suffix_to_mimetype[ext])
+    return f.read()
+
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
 if __name__ == '__main__':
-    app.run()
+    import os
+    host = os.environ.get('HOST', '127.0.0.1')
+    port = int(os.environ.get('PORT', 80))
+    app.run(host=host, port=port)
