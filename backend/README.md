@@ -1,4 +1,1 @@
-appliance-workflow-backend
-==========================
-
-A backend workflow for queueing appliances on various cloud infrastructure. 
+Backend workflow for queueing appliances on various cloud infrastructure. 
