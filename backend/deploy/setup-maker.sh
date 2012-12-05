@@ -1,5 +1,6 @@
 #!/bin/bash
 
+maker -CTL
 python set_options.py maker_opts.ctl alttest jap_glab_brachy.cdna.fa
 python set_options.py maker_opts.ctl protein jap_glab_brachy.pep.fa 
 python set_options.py maker_opts.ctl rmlib PReDa_121015_short.fasta
