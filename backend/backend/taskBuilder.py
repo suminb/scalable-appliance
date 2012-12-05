@@ -3,7 +3,6 @@ import sys, os, logging, tempfile
 
 class TaskBuilder():
     def __init__(self, cmdline, input_dir="", remote_dir="", output_dir="", wildcard="*"):
-        self.cmdline = cmdline.strip()
         self.remote_dir = remote_dir
         self.output_dir = output_dir 
         self.input_dir = input_dir
@@ -14,6 +13,12 @@ class TaskBuilder():
         self.temp_dir = tempfile.mkdtemp(prefix="backend-")
         self.wildcard = wildcard
         self.cur_id = 0
+        
+        cmd, sep, self.args = cmdline.partition(" ")
+        cmdpath = os.path.abspath(cmd)
+        if os.path.isfile(cmdpath):
+            self.cmd = os.path.basename(cmdpath)
+            self.add_file(cmdpath) 
 
     def build_task(self, work_file):
         name = os.path.basename(work_file).strip()
@@ -26,7 +31,6 @@ class TaskBuilder():
 
         wf = os.path.join(self.input_dir, name)
         if os.path.isfile(wf):
-            print "name", name
             worker.specify_file(wf, name, type=WORK_QUEUE_INPUT,
                 cache=False)
         else:
@@ -46,14 +50,7 @@ class TaskBuilder():
                 fp.write("bash %s" % cmdstring)
 
             # COMMAND
-            cmdpath = os.path.abspath(self.cmdline[:self.cmdline.find(" ")])
-            if os.path.isfile(cmdpath):
-                cmdname = os.path.basename(cmdpath)
-                cmdstring = "bash %s %s" % (self.cmdline, name)
-                worker.specify_file(cmdpath, cmdname, type=WORK_QUEUE_INPUT)
-            else:
-                cmdstring = "%s %s" % (self.cmdline, name)
-
+            cmdstring = "bash %s %s %s" % (self.cmd, self.args, name)
             cmd_status = 'echo "running %s"\n' % name
             fp.write(cmd_status)
             fp.write(self.append_newline(cmdstring))
@@ -122,8 +119,11 @@ class TaskBuilder():
     def add_file(self, filename, source_dir="", remote=False):
         filename = filename.strip()
         name = os.path.basename(filename)
-        dfile = os.path.join(source_dir, name)
-        
+        if source_dir:
+            dfile = os.path.join(source_dir, name)
+        else:
+            dfile = name
+
         found = [os.path.isfile(filename), os.path.isfile(dfile)]
         success = True
 
