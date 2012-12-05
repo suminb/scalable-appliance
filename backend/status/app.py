@@ -40,7 +40,16 @@ def version():
     return jsonify(methods_supported=[
         'memory_usage',
         'disk_usage',
+        'cpu',
     ])
+
+@app.route('/v0.9/cpu')
+def cpu():
+    percents = psutil.cpu_percent(percpu=True)
+    response = {}
+    for cpu, percent in enumerate(percents):
+        response['cpu-%d' % cpu] = percent
+    return jsonify(response)
 
 @app.route('/v0.9/memory_usage')
 def memory_usage():
