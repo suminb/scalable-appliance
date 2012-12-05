@@ -2,7 +2,7 @@ from work_queue import *
 import sys, os, logging, tempfile
 
 class TaskBuilder():
-    def __init__(self, cmdline, input_dir="", remote_dir="", output_dir=""):
+    def __init__(self, cmdline, input_dir="", remote_dir="", output_dir="", wildcard="*"):
         self.cmdline = cmdline.strip()
         self.remote_dir = remote_dir
         self.output_dir = output_dir 
@@ -12,6 +12,7 @@ class TaskBuilder():
         self.posthooks = []
         self.temp_files = []
         self.temp_dir = tempfile.mkdtemp(prefix="backend-")
+        self.wildcard = wildcard
         self.cur_id = 0
 
     def build_task(self, work_file):
@@ -26,20 +27,21 @@ class TaskBuilder():
             return
         
         try:
-            script_name = "%s%s%s" % ("worker-", str(self.cur_id), ".sh")
-            script = "%s/%s" % (self.temp_dir, script_name)
+            script_name = "worker-" + str(self.cur_id) + ".sh"
+            script = os.path.join(self.temp_dir, script_name)
             fp = open(script, 'w+')
+
             fp.write(self.append_newline("#!/bin/bash"))
 
             # Generate prehooks
             for cmdstring in self.prehooks:
                 prehook_msg = 'echo "running %s"\n' % cmdstring.strip()
                 fp.write(prehook_msg)
-                fp.write("./" + cmdstring)
+                fp.write("./%s" % cmdstring)
 
             # COMMAND
             if os.path.isfile(os.path.abspath(self.cmdline)):
-                add_file(self.cmdline)
+                cmdpath = os.path.abspath(self.cmdline)
                 cmdstring = "./%s %s" % (self.cmdline, name)
             else:
                 cmdstring = "%s %s" % (self.cmdline, name)
@@ -54,8 +56,9 @@ class TaskBuilder():
                 cmd = cmdstring[:arg_index]
                 posthook_msg = 'echo "running %s"\n' % cmd.strip()
                 fp.write(posthook_msg)
-                fp.write("./" + cmdstring)
-        except:
+                fp.write("./%s" % cmdstring)
+        except Exception as e:
+            print str(e)
             logging.warn(script_name + ": task could not be written.")
             return None
         finally:
@@ -66,12 +69,20 @@ class TaskBuilder():
 
         # Add files to the Task
         worker = Task("/bin/bash %s" % script_name)
+
+        if cmdpath:
+            worker.specify_file(cmdpath, cmdstring, type=WORK_QUEUE_INPUT) 
+
         for (localfile, queue_type, cache) in self.files:
+            if self.wildcard in localfile:
+                ext_index = name.rfind(".")
+                localfile = localfile.replace(self.wildcard, name[:ext_index])
+
             filename = os.path.basename(localfile)
-            remote = "%s/%s" % (self.remote_dir, filename)
+            remote = os.path.join(self.remote_dir, filename)
             worker.specify_file(localfile, filename,
                 type=queue_type, cache=cache)
-        
+
         worker.specify_file("/bin/bash", "bash", type=WORK_QUEUE_INPUT)
         worker.specify_file(script, script_name, type=WORK_QUEUE_INPUT,
             cache=False)
@@ -108,23 +119,24 @@ class TaskBuilder():
     def add_file(self, filename, source_dir="", remote=False):
         filename = filename.strip()
         name = os.path.basename(filename)
-
-        if source_dir.endswith("/"):
-            dfile = source_dir + name
-        else:
-            dfile = "%s/%s" % (source_dir, name)
+        dfile = os.path.join(source_dir, name)
         
         found = [os.path.isfile(filename), os.path.isfile(dfile)]
         success = True
 
         exist = [os.path.basename(fn) == name for (fn, t, c) in self.files]
-       
-        if any(exist) or (remote and found):
+
+        if remote and self.wildcard in filename:
+            output_name = os.path.join(self.output_dir, filename)
+            output_file = (output_name, WORK_QUEUE_OUTPUT, False)
+            self.files.append(output_file)
+        elif any(exist) or (remote and found):
             logging.warn(name + ": this result file already exists.")
             success = False
         elif not found and remote:
-            output_file = (filename, WORK_QUEUE_OUTPUT, False)
-            self.files.append(self.result_dir, output_file) 
+            output_name = os.path.join(self.output_dir, filename)
+            output_file = (output_name, filename, WORK_QUEUE_OUTPUT, False)
+            self.files.append(output_file)
         elif found[0]:
             input_file = (filename, WORK_QUEUE_INPUT, True)
             self.files.append(input_file)
@@ -140,7 +152,7 @@ class TaskBuilder():
     def cleanup(self):
         try:
             for tmpfile in self.temp_files:
-                os.remove("%s/%s" % (self.temp_dir, tmpfile))
+                os.path.join(self.temp_dir, tmpfile)
             
             os.rmdir(self.temp_dir)
         except:

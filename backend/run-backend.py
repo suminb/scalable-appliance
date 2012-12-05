@@ -67,10 +67,7 @@ def configure_settings(args, config):
         config.set_option("startup_script", args.script)
 
     if args.workdir and os.path.isdir(args.workdir):
-        if not args.workdir.endswith("/"):
-            config.set_option("work_dir", args.workdir + "/")
-        else:
-            config.set_option("work_dir", args.workdir)
+        config.set_option("work_dir", args.workdir)
     
     if args.results and os.path.isdir(args.results):
         config.set_option("output_dir", args.results)
@@ -105,19 +102,23 @@ if __name__ == "__main__":
         path = config.get_option("work_dir")
         tmp = os.listdir(path)
         
-        if args.filter and not isinstance(args.filter, list):
-            filters = [args.filter]
-        elif args.filter:
-            filters = args.filter
+        if args.filter:
+            filters = args.filter.split()
         else:
             filters = []
 
         if filters:
             f = [filter(lambda x: x.endswith(f), tmp) for f in filters]
+            fl = []
+            map(lambda x: fl.extend(x), f)
         else:
-            f = tmp
+            fl = tmp
         
-        files = filter(os.path.isfile, map(lambda x : path + "/"+ x, f))
+        files = filter(os.path.isfile, map(lambda x : os.path.join(path, x), fl))
+
+        if not files:
+            print "No files where found."
+            sys.exit(0)
 
         for f in files:
             logging.info(f + " was found.")
