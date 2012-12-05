@@ -37,12 +37,14 @@ class TaskBuilder():
             logging.warn(name + ": not a valid file.")
             return
         
+            
         try:
             script = os.path.join(self.temp_dir, script_name)
             fp = open(script, 'w+')
 
             fp.write(self.append_newline("#!/bin/bash"))
-
+            fp.write(self.append_newline("export WORK_FILE=%s" % name))
+            
             # Generate prehooks
             for cmdstring in self.prehooks:
                 prehook_msg = 'echo "running %s"\n' % cmdstring.strip()
