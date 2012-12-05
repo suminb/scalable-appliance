@@ -17,17 +17,23 @@ class TaskBuilder():
 
     def build_task(self, work_file):
         name = os.path.basename(work_file).strip()
+        script_name = "worker-" + str(self.cur_id) + ".sh"
+        worker = Task("/bin/bash %s" % script_name)
 
         if not work_file:
             logging.warn("no work_file specified.")
             return
 
-        if not self.add_file(work_file, source_dir=self.input_dir):
-            logging.warn(name + ": could not add worker.")
+        wf = os.path.join(self.input_dir, name)
+        if os.path.isfile(wf):
+            print "name", name
+            worker.specify_file(wf, name, type=WORK_QUEUE_INPUT,
+                cache=False)
+        else:
+            logging.warn(name + ": not a valid file.")
             return
         
         try:
-            script_name = "worker-" + str(self.cur_id) + ".sh"
             script = os.path.join(self.temp_dir, script_name)
             fp = open(script, 'w+')
 
@@ -37,12 +43,14 @@ class TaskBuilder():
             for cmdstring in self.prehooks:
                 prehook_msg = 'echo "running %s"\n' % cmdstring.strip()
                 fp.write(prehook_msg)
-                fp.write("./%s" % cmdstring)
+                fp.write("bash %s" % cmdstring)
 
             # COMMAND
-            if os.path.isfile(os.path.abspath(self.cmdline)):
-                cmdpath = os.path.abspath(self.cmdline)
-                cmdstring = "./%s %s" % (self.cmdline, name)
+            cmdpath = os.path.abspath(self.cmdline[:self.cmdline.find(" ")])
+            if os.path.isfile(cmdpath):
+                cmdname = os.path.basename(cmdpath)
+                cmdstring = "bash %s %s" % (self.cmdline, name)
+                worker.specify_file(cmdpath, cmdname, type=WORK_QUEUE_INPUT)
             else:
                 cmdstring = "%s %s" % (self.cmdline, name)
 
@@ -56,7 +64,7 @@ class TaskBuilder():
                 cmd = cmdstring[:arg_index]
                 posthook_msg = 'echo "running %s"\n' % cmd.strip()
                 fp.write(posthook_msg)
-                fp.write("./%s" % cmdstring)
+                fp.write("bash %s" % cmdstring)
         except Exception as e:
             print str(e)
             logging.warn(script_name + ": task could not be written.")
@@ -68,11 +76,6 @@ class TaskBuilder():
             fp.close()
 
         # Add files to the Task
-        worker = Task("/bin/bash %s" % script_name)
-
-        if cmdpath:
-            worker.specify_file(cmdpath, cmdstring, type=WORK_QUEUE_INPUT) 
-
         for (localfile, queue_type, cache) in self.files:
             if self.wildcard in localfile:
                 ext_index = name.rfind(".")

@@ -53,7 +53,7 @@ def get_arguments():
 
 
 def configure_settings(args, config):
-    if args.deploy and os.path.isfile(args.deploy):
+    if args.deploy and os.path.isfile(os.path.abspath(args.deploy)):
         config.set_option("deploy", args.deploy)
     
     if not args.aws and not args.openstack:
