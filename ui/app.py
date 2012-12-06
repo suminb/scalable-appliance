@@ -74,10 +74,14 @@ def chromosomes(parent):
     chromos = [splitext(gff)[0] for gff in chromos_gffs]
     return render_template('chromosomes.html', parent=parent, chromosomes=chromos)
 
-def utc_timestamp():
-    """Return a current timestamp as ISO8601: 2012-12-25T13:45:59Z"""
+def unix_timestamp():
+    import time
+    return '%.3f' % time.time()
+
+def unix_to_iso8601(timestamp):
     import datetime
-    utc = datetime.datetime.utcnow()
+    """Return unix `timestamp` converted to ISO8601: 2012-12-25T13:45:59Z"""
+    utc = datetime.datetime.fromtimestamp(timestamp)
     return utc.strftime('%Y-%m-%dT%H:%M:%SZ')
 
 @app.route('/register_worker', methods=['POST'])
@@ -91,11 +95,11 @@ def register_worker():
 
     r = redis.StrictRedis()
     key = 'worker:' + hostname
-    now = utc_timestamp()
+    now = unix_timestamp()
     r.hset(key, 'created', now)
     r.hset(key, 'last_pong', now)
 
-    PEM = os.environ.get('PEM');
+    PEM = os.environ.get('PEM', 'might-be-running-in-debug');
     p = subprocess.Popen(["ssh", "-i", PEM,
         "ubuntu@" + hostname], stdin=subprocess.PIPE)
     with open('remote.sh') as f:
@@ -103,12 +107,20 @@ def register_worker():
 
     return 'worker registered\n'
 
+@app.route('/unregister_worker', methods=['POST'])
+def unregister_worker():
+    assert 'hostname' in request.form
+    hostname = request.form['hostname']
+    r = redis.StrictRedis()
+    r.delete('worker:' + hostname)
+    return 'worker unregistered\n'
+
 @app.route('/update_worker', methods=['POST'])
 def update_worker():
     assert 'hostname' in request.form
     hostname = request.form['hostname']
     r = redis.StrictRedis()
-    r.hset('worker:' + hostname, 'last_pong', utc_timestamp())
+    r.hset('worker:' + hostname, 'last_pong', unix_timestamp())
     return 'worker updated\n'
 
 @app.route('/workers')
