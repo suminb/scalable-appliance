@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 from werkzeug.exceptions import default_exceptions
 from werkzeug.exceptions import HTTPException
 import psutil
+import subprocess
 
 # http://flask.pocoo.org/snippets/83/
 def make_json_app(import_name, **kwargs):
@@ -38,10 +39,15 @@ def index():
 @app.route('/v0.9/version')
 def version():
     return jsonify(methods_supported=[
+        'os_name',
         'memory_usage',
         'disk_usage',
         'cpu',
     ])
+
+@app.route('/v0.9/os_name')
+def os_name():
+    return subprocess.check_output(("uname", "-a")) 
 
 @app.route('/v0.9/cpu')
 def cpu():
