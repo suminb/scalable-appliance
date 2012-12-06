@@ -14,7 +14,6 @@ python setoption.py maker_opts.ctl repeat_protein $repeat_protein
 python setoption.py maker_opts.ctl snaphmm $snaphmm
 python setoption.py maker_opts.ctl genome $WORK_FILE
 python setoption.py maker_opts.ctl cpus `grep -c "^processor" /proc/cpuinfo`
-
 if [[ ! ( -f $alttest && -f $protein && -f $rmlib && -f $snaphmm ) ]]; then
 	cp /home/ubuntu/maker_constant/* .
 else
