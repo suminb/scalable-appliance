@@ -15,4 +15,4 @@ sudo HOST=0.0.0.0 nohup status/bin/python app.py &
 echo "Starting pong worker..."
 nohup bash pong.sh &
 echo "Done."
-logout
+exit
