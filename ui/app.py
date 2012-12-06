@@ -140,10 +140,13 @@ def worker_info():
         _, hostname = worker.split(':')
         host_response = {}
         for endpoint in ('os_name', 'memory_usage', 'disk_usage', 'cpu'):
-            try: 
+            try:
                 resp = requests.get('http://'+hostname+'/v0.9/' + endpoint)
                 if resp.status_code == 200:
-                    host_response[endpoint] = resp.json
+                    if endpoint == 'os_name':
+                        host_response[endpoint] = resp.text
+                    else:
+                        host_response[endpoint] = resp.json
             except requests.ConnectionError:
                 # kill them if they can't be reached
                 r.delete(worker)
