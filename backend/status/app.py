@@ -1,6 +1,7 @@
 from flask import Flask, jsonify
 from werkzeug.exceptions import default_exceptions
 from werkzeug.exceptions import HTTPException
+import psutil
 
 # http://flask.pocoo.org/snippets/83/
 def make_json_app(import_name, **kwargs):
@@ -39,33 +40,46 @@ def version():
     return jsonify(methods_supported=[
         'memory_usage',
         'disk_usage',
-        'task',
+        'cpu',
     ])
+
+@app.route('/v0.9/cpu')
+def cpu():
+    percents = psutil.cpu_percent(percpu=True)
+    response = {}
+    for cpu, percent in enumerate(percents):
+        response['cpu-%d' % cpu] = percent
+    return jsonify(response)
 
 @app.route('/v0.9/memory_usage')
 def memory_usage():
+    memory = psutil.virtual_memory()
     status = {
-        'resident': 'a metric cats worth',
-        'shared': '42',
-        'private': '84',
-        'virtual': '1.21 gigabits'
+        'total': memory.total,
+        'available': memory.available,
+        'used': memory.used,
+        'free': memory.free,
+        'active': memory.active,
+        'inactive': memory.inactive,
+        'percent': memory.percent,
     }
     return jsonify(status)
 
 @app.route('/v0.9/disk_usage')
 def disk_usage():
-    status = {
-        '/dev/sda1': {
-            'mountpoint': '/',
-            'total': 1234567890,
-            'used': 43211234
-        },
-        '/dev/sdb1': {
-            'mountpoint': '/home',
-            'total': 2311328,
-            'used': 123929
+    partitions = psutil.disk_partitions()
+    status = {}
+    for partition in partitions:
+        usage = psutil.disk_usage(partition.mountpoint)
+        status[partition.device] = {
+            'mountpoint': partition.mountpoint,
+            'fstype': partition.fstype,
+            'opts': partition.opts,
+            'total': usage.total,
+            'used': usage.used,
+            'free': usage.free,
+            'percent': usage.percent
         }
-    }
     return jsonify(status)
 
 if __name__ == '__main__':

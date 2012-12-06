@@ -1,10 +1,11 @@
 import json
 import linecache
 
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, jsonify
 from werkzeug.contrib.fixers import ProxyFix
 from glob import glob
 from os.path import basename, splitext
+import redis
 
 app = Flask(__name__)
 app.debug = True
@@ -70,13 +71,38 @@ def chromosomes(parent):
     chromos = [splitext(gff)[0] for gff in chromos_gffs]
     return render_template('chromosomes.html', parent=parent, chromosomes=chromos)
 
-@app.route('/register_worker/', methods=['POST'])
-def register_worker():
-    return 'Register: name is ' + request.form['name'] + '\n'
+def utc_timestamp():
+    """Return a current timestamp as ISO8601: 2012-12-25T13:45:59Z"""
+    import datetime
+    utc = datetime.datetime.utcnow()
+    return utc.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-@app.route('/update_worker/', methods=['POST'])
+@app.route('/register_worker', methods=['POST'])
+def register_worker():
+    assert 'hostname' in request.form
+    hostname = request.form['hostname']
+    r = redis.StrictRedis()
+    key = 'worker:' + hostname
+    now = utc_timestamp()
+    r.hset(key, 'created', now)
+    r.hset(key, 'last_pong', now)
+    return 'worker registered\n'
+
+@app.route('/update_worker', methods=['POST'])
 def update_worker():
-    return 'Update: name is ' + request.form['name'] + '\n'
+    assert 'hostname' in request.form
+    hostname = request.form['hostname']
+    r = redis.StrictRedis()
+    r.hset('worker:' + hostname, 'last_pong', utc_timestamp())
+    return 'worker updated\n'
+
+@app.route('/workers')
+def workers():
+    r = redis.StrictRedis()
+    response = {}
+    for key in r.keys('worker:*'):
+        response[key] = r.hgetall(key)
+    return jsonify(response)
 
 file_suffix_to_mimetype = {
     '.css': 'text/css',
