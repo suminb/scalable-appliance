@@ -3,6 +3,7 @@ import linecache
 import os
 import subprocess
 import re
+import requests
 
 from flask import Flask, request, render_template, jsonify
 from werkzeug.contrib.fixers import ProxyFix
@@ -64,7 +65,6 @@ def gff_ajax(gff):
 
     data['size'] = len(gff_data)
     data['gff'] = gff_data
-    data['disclaimer'] = "I have no idea what version of GFF this data is, don't trust anything you see here"
     return json.dumps(data, indent=2)
 
 @app.route('/chromosomes/<parent>')
@@ -131,18 +131,27 @@ def workers():
         response[key] = r.hgetall(key)
     return jsonify(response)
 
-'''
 @app.route('/worker_info')
 def worker_info():
     r = redis.StrictRedis()
+    response = {}
     for worker in r.keys('worker:*'):
-        info = r.getall(worker)
+        info = r.hgetall(worker)
+        _, hostname = worker.split(':')
+        host_response = {}
+        for endpoint in ('os_name', 'memory_usage', 'disk_usage', 'cpu'):
+            try: 
+                resp = requests.get('http://'+hostname+'/v0.9/' + endpoint)
+                if resp.status_code == 200:
+                    host_response[endpoint] = resp.json
+            except requests.ConnectionError:
+                # kill them if they can't be reached
+                r.delete(worker)
 
-        # remove dead workers
-        info.get('last_pong', )
+        if host_response:
+            response[hostname] = host_response
 
-'''
-
+    return jsonify(response)
 
 file_suffix_to_mimetype = {
     '.css': 'text/css',
