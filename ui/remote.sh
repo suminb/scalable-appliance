@@ -11,8 +11,8 @@ deactivate
 virtualenv status
 source status/bin/activate
 echo "Starting status server..."
-sudo HOST=0.0.0.0 nohup status/bin/python app.py &
+sudo HOST=0.0.0.0 nohup status/bin/python app.py </dev/null >/dev/null 2>/dev/null &
 echo "Starting pong worker..."
-nohup bash pong.sh &
+nohup bash pong.sh </dev/null >/dev/null 2>/dev/null &
 echo "Done."
 exit
