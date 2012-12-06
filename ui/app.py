@@ -1,5 +1,6 @@
 import json
 import linecache
+import os
 import subprocess
 import re
 
@@ -94,7 +95,8 @@ def register_worker():
     r.hset(key, 'created', now)
     r.hset(key, 'last_pong', now)
 
-    p = subprocess.Popen(["ssh", "-i", "/home/charlesl/monitoring-test.pem",
+    PEM = os.environ.get('PEM');
+    p = subprocess.Popen(["ssh", "-i", PEM,
         "ubuntu@" + hostname], stdin=subprocess.PIPE)
     with open('remote.sh') as f:
         p.stdin.write(f.read())
@@ -116,6 +118,19 @@ def workers():
     for key in r.keys('worker:*'):
         response[key] = r.hgetall(key)
     return jsonify(response)
+
+'''
+@app.route('/worker_info')
+def worker_info():
+    r = redis.StrictRedis()
+    for worker in r.keys('worker:*'):
+        info = r.getall(worker)
+
+        # remove dead workers
+        info.get('last_pong', )
+
+'''
+
 
 file_suffix_to_mimetype = {
     '.css': 'text/css',
