@@ -94,10 +94,10 @@ def register_worker():
     r.hset(key, 'created', now)
     r.hset(key, 'last_pong', now)
 
-    p_in = subprocess.Popen(["ssh", "-i", "/home/charlesl/monitoring-test.pem",
-        "ubuntu@" + hostname], stdin=subprocess.PIPE).stdin
+    p = subprocess.Popen(["ssh", "-i", "/home/charlesl/monitoring-test.pem",
+        "ubuntu@" + hostname], stdin=subprocess.PIPE)
     with open('remote.sh') as f:
-        p_in.communicate(input=f.read())
+        p.stdin.write(f.read())
 
     return 'worker registered\n'
 
