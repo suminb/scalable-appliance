@@ -1,5 +1,7 @@
 import json
 import linecache
+import subprocess
+import re
 
 from flask import Flask, request, render_template, jsonify
 from werkzeug.contrib.fixers import ProxyFix
@@ -81,11 +83,22 @@ def utc_timestamp():
 def register_worker():
     assert 'hostname' in request.form
     hostname = request.form['hostname']
+
+    # must be a hostname, please no pwning
+    if len(re.findall(r'[.a-zA-Z\d-]+', hostname)) != 1:
+        abort(400)
+
     r = redis.StrictRedis()
     key = 'worker:' + hostname
     now = utc_timestamp()
     r.hset(key, 'created', now)
     r.hset(key, 'last_pong', now)
+
+    p_in = subprocess.Popen(["ssh", "-i", "/home/charlesl/monitoring-test.pem",
+        "ubuntu@" + hostname], stdin=subprocess.PIPE).stdin
+    with open('remote.sh') as f:
+        p_in.communicate(input=f.read())
+
     return 'worker registered\n'
 
 @app.route('/update_worker', methods=['POST'])
