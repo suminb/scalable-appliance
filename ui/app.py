@@ -36,19 +36,15 @@ def gff_ajax(gff):
 
     data = {}
     data['offset'] = offset
+    data['finished'] = False
     gff_data = []
     for i in range(offset+1, offset+size+1):
         line = linecache.getline(full_gff, offset + i)
         if line and not line.strip().startswith('#'):
-            parts = line.split()[:9]
-            while len(parts) < 9:
-                parts.append('')
-
-            (seqname, feature, type, start, end, score,
-            strand, phase, attributes) = parts
+            (seqid, feature, type, start, end, score,
+            strand, phase, attributes) = line.split('\t')
             gff_data.append({
-                'line' : line,
-                'seqname': seqname,
+                'seqid': seqid,
                 'feature': feature,
                 'type': type,
                 'start': start,
@@ -58,6 +54,9 @@ def gff_ajax(gff):
                 'phase': phase,
                 'attributes': attributes,
             })
+        elif not line:
+            data['finished'] = True
+
 
     data['size'] = len(gff_data)
     data['gff'] = gff_data
