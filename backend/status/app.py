@@ -47,7 +47,7 @@ def version():
 
 @app.route('/v0.9/os_name')
 def os_name():
-    return subprocess.check_output(("uname", "-a")) 
+    return jsonify({'os_name':subprocess.check_output(("uname", "-a"))})
 
 @app.route('/v0.9/cpu')
 def cpu():

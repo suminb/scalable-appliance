@@ -143,15 +143,19 @@ def worker_info():
             try:
                 resp = requests.get('http://'+hostname+'/v0.9/' + endpoint)
                 if resp.status_code == 200:
-                    if endpoint == 'os_name':
-                        host_response[endpoint] = resp.text
-                    else:
-                        host_response[endpoint] = resp.json
+                    host_response[endpoint] = resp.json
             except requests.ConnectionError:
+                pass
                 # kill them if they can't be reached
-                r.delete(worker)
+                # TODO and are older than 10 minutes
+                # r.delete(worker)
 
         if host_response:
+            if 'last_pong' in info:
+                response['last_heartbeat'] = unix_to_iso8601(
+                    float(info['last_pong']))
+            if 'created' in info:
+                response['created'] = info['created']
             response[hostname] = host_response
 
     return jsonify(response)
