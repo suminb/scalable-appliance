@@ -5,6 +5,8 @@ import os
 import subprocess
 import re
 
+from collections import defaultdict
+from itertools import cycle, izip
 from flask import Flask, request, render_template, jsonify
 from werkzeug.contrib.fixers import ProxyFix
 from glob import glob
@@ -140,30 +142,35 @@ def workers():
 @app.route('/worker_info')
 def worker_info():
     r = redis.StrictRedis()
-    response = {}
+    response = defaultdict(dict)
 
     # this whole loop could be added into the grequest for max speed
+    urls = []
+    hosts = []
+    info_list = []
+    endpoints = ('os_name', 'memory_usage', 'disk_usage', 'cpu')
     for worker in r.keys('worker:*'):
         info = r.hgetall(worker)
         _, hostname = worker.split(':')
-        host_response = {}
-        endpoints = ('os_name', 'memory_usage', 'disk_usage', 'cpu')
-        rs = (grequests.get('http://'+hostname+'/v0.9/' + endpoint,
-            timeout=0.1) for endpoint in endpoints)
+        for endpoint in endpoints:
+            url = 'http://'+hostname+'/v0.9/' + endpoint
+            hosts.append(hostname)
+            urls.append(url)
+            info_list.append(info)
 
-        # this spews exceptions from greenlet, but is really fast, probably
-        # need to dive into gevent/greenlets to solve
-        for i, resp in enumerate(grequests.map(rs)):
-            if resp.status_code == 200:
-                host_response[endpoints[i]] = resp.json
+    rs = (grequests.get(url, timeout=0.1) for url in urls)
 
-        if host_response:
+    # this spews exceptions from greenlet, but is really fast, probably
+    # need to dive into gevent/greenlets to solve
+    for host, info, resp, endpoint in izip(hosts, info_list, grequests.map(rs), cycle(endpoints)):
+        if resp.status_code == 200:
+            response[host][endpoint] = resp.json
+
             if 'last_pong' in info:
-                host_response['last_heartbeat'] = unix_to_iso8601(
+                response[host]['last_heartbeat'] = unix_to_iso8601(
                     float(info['last_pong']))
             if 'created' in info:
-                host_response['created'] = info['created']
-            response[hostname] = host_response
+                response[host]['created'] = info['created']
 
     return jsonify(response)
 
