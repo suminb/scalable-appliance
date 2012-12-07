@@ -170,7 +170,6 @@ def worker_info():
             cycle(endpoints)):
             if resp.status_code == 200:
                 response[host][endpoint] = resp.json
-
                 if 'last_pong' in info:
                     response[host]['last_heartbeat'] = unix_to_iso8601(
                         float(info['last_pong']))
