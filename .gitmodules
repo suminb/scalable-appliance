@@ -1,0 +1,7 @@
+[submodule "ui/public/SlickGrid"]
+    path = ui/public/SlickGrid
+    url = git://github.com/mleibman/SlickGrid.git
+
+[submodule "ui/rickshaw"]
+    path = ui/rickshaw
+    url = git://github.com/shutterstock/rickshaw.git

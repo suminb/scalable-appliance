@@ -1,5 +1,9 @@
 import json
 import linecache
+import os
+import subprocess
+import re
+import requests
 
 from flask import Flask, request, render_template, jsonify
 from werkzeug.contrib.fixers import ProxyFix
@@ -61,7 +65,6 @@ def gff_ajax(gff):
 
     data['size'] = len(gff_data)
     data['gff'] = gff_data
-    data['disclaimer'] = "I have no idea what version of GFF this data is, don't trust anything you see here"
     return json.dumps(data, indent=2)
 
 @app.route('/chromosomes/<parent>')
@@ -71,29 +74,53 @@ def chromosomes(parent):
     chromos = [splitext(gff)[0] for gff in chromos_gffs]
     return render_template('chromosomes.html', parent=parent, chromosomes=chromos)
 
-def utc_timestamp():
-    """Return a current timestamp as ISO8601: 2012-12-25T13:45:59Z"""
+def unix_timestamp():
+    import time
+    return '%.3f' % time.time()
+
+def unix_to_iso8601(timestamp):
     import datetime
-    utc = datetime.datetime.utcnow()
+    """Return unix `timestamp` converted to ISO8601: 2012-12-25T13:45:59Z"""
+    utc = datetime.datetime.fromtimestamp(timestamp)
     return utc.strftime('%Y-%m-%dT%H:%M:%SZ')
 
 @app.route('/register_worker', methods=['POST'])
 def register_worker():
     assert 'hostname' in request.form
     hostname = request.form['hostname']
+
+    # must be a hostname, please no pwning
+    if len(re.findall(r'[.a-zA-Z\d-]+', hostname)) != 1:
+        abort(400)
+
     r = redis.StrictRedis()
     key = 'worker:' + hostname
-    now = utc_timestamp()
+    now = unix_timestamp()
     r.hset(key, 'created', now)
     r.hset(key, 'last_pong', now)
+
+    PEM = os.environ.get('PEM', 'might-be-running-in-debug');
+    p = subprocess.Popen(["ssh", "-i", PEM,
+        "ubuntu@" + hostname], stdin=subprocess.PIPE)
+    with open('remote.sh') as f:
+        p.stdin.write(f.read())
+
     return 'worker registered\n'
+
+@app.route('/unregister_worker', methods=['POST'])
+def unregister_worker():
+    assert 'hostname' in request.form
+    hostname = request.form['hostname']
+    r = redis.StrictRedis()
+    r.delete('worker:' + hostname)
+    return 'worker unregistered\n'
 
 @app.route('/update_worker', methods=['POST'])
 def update_worker():
     assert 'hostname' in request.form
     hostname = request.form['hostname']
     r = redis.StrictRedis()
-    r.hset('worker:' + hostname, 'last_pong', utc_timestamp())
+    r.hset('worker:' + hostname, 'last_pong', unix_timestamp())
     return 'worker updated\n'
 
 @app.route('/workers')
@@ -102,6 +129,31 @@ def workers():
     response = {}
     for key in r.keys('worker:*'):
         response[key] = r.hgetall(key)
+    return jsonify(response)
+
+@app.route('/worker_info')
+def worker_info():
+    r = redis.StrictRedis()
+    response = {}
+    for worker in r.keys('worker:*'):
+        info = r.hgetall(worker)
+        _, hostname = worker.split(':')
+        host_response = {}
+        for endpoint in ('os_name', 'memory_usage', 'disk_usage', 'cpu'):
+            try:
+                resp = requests.get('http://'+hostname+'/v0.9/' + endpoint)
+                if resp.status_code == 200:
+                    if endpoint == 'os_name':
+                        host_response[endpoint] = resp.text
+                    else:
+                        host_response[endpoint] = resp.json
+            except requests.ConnectionError:
+                # kill them if they can't be reached
+                r.delete(worker)
+
+        if host_response:
+            response[hostname] = host_response
+
     return jsonify(response)
 
 file_suffix_to_mimetype = {
