@@ -1,35 +1,17 @@
-from backend import *
-from simpleWorker import *
-
-import argparse, sys, ConfigParser, boto
+from backend import * 
+import argparse, logging, sys, os, ConfigParser
 
 def get_arguments():
     parser = argparse.ArgumentParser(
-        usage="%(prog)s [options] project",
+        usage="%(prog)s [options] project command",
         description="Distributes work to various cloud providers.")
 
     parser.add_argument("project",
-        help="name of the project to be run")
+        help="name of the project the backend is running.")
 
-    # General
-    parser.add_argument("-w", "--workdir", metavar="",
-        help="directory where work will be found")
-
-    parser.add_argument("-r", "--results", metavar="",
-        help="directory where results will be stored.")
-
-    parser.add_argument("-c", "--config", metavar="",
-        help="configuration file used to run instances")
-    
-    parser.add_argument("-d", "--deploy", metavar="",
-        help="list of files to be sent to all instances.")
-
-    parser.add_argument("-f", "--file", metavar="", dest="script",
-        help="script executed on instance after starting up")
-
-    parser.add_argument("-s", "--size", metavar="",
-        help="size of the workers to be used")
-  
+    parser.add_argument("command",
+        help="command to be executed for each file.")
+   
     # AWS
     parser.add_argument("-a", "--aws", dest="aws", metavar="",
         help="number of AWS instances to use", type=int)
@@ -41,16 +23,43 @@ def get_arguments():
     # Iplant
     parser.add_argument("-i", "--iplant", dest="openstack", metavar="",
         help="number of IPlant instances to use", type=int)
+    
+    # General
+    parser.add_argument("-w", "--workdir", metavar="",
+        help="directory where work will be found")
+
+    parser.add_argument("-r", "--results", metavar="",
+        help="directory where results will be stored.")
+
+    parser.add_argument("-c", "--config", metavar="",
+        help="configuration file used used by the backend")
+    
+    parser.add_argument("-d", "--deploy", metavar="",
+        help="list of files to be sent to all instances.")
+
+    parser.add_argument("-f", "--file", metavar="", dest="script",
+        help="script executed on instance after starting up")
+    
+    parser.add_argument("-s", "--size", metavar="",
+        help="size of the workers to be used")
+    
+    parser.add_argument("-p", "--port", type=int, metavar="",
+        help="port that the backend runs on")
+    
+    parser.add_argument("--filter", metavar="",
+        help="select only files with the following extensions")
+
+    parser.add_argument("--simulate", action="store_true",
+        help="simulates the backend without any instances.")
 
     return parser.parse_args()
 
 
 def configure_settings(args, config):
-    
-    if args.deploy and os.path.isfile(args.deploy):
+    if args.deploy and os.path.isfile(os.path.abspath(args.deploy)):
         config.set_option("deploy", args.deploy)
     
-    if not args.aws and not args.openstack:
+    if not args.aws and not args.openstack and not args.simulate:
         print "Please specify the number of instances to be used."
         sys.exit(1)
     else:
@@ -66,97 +75,80 @@ def configure_settings(args, config):
     if args.results and os.path.isdir(args.results):
         config.set_option("output_dir", args.results)
 
+    if args.port:
+        config.set_option("port", args.port)
+
+    if args.config:
+        config.set_option("config", args.config)
+    else:
+        config.set_option("config", "/etc/acic.cfg")
+
 if __name__ == "__main__":
     args = get_arguments() 
-
-    backend = backend.Backend(args.project, args.config)
-    config = backend.config_manager
+    config = configurationManager.ConfigurationManager()
     configure_settings(args, config)
-    
+    backend = backend.Backend(args.project, args.command, config)
+
     if config.has_option("startup_script"):
         startup_script = config.get_option("startup_script")
         try:
             script = open(startup_script).read()
+            script = script.replace("%PROJECT%", args.project)
         except:
             print "The startup script %s could not be opened." % startup_script
             sys.exit(1) 
     else:
         script = ""
 
-    backend.start() 
+    if config.has_option("deploy"):
+        print "Adding deploy files"
+        backend.deploy_files(config.get_option("deploy"))
     
-    print "Starting instances"
-    workers = config.get_option('num_instances')
-    #for (provider, num_instances) in workers.iteritems():
-    #    backend.add_workers(provider, num_instances, script)
-    
-    evidence_files = {'alttest' : "jap_glab_brachy.cdna.fa",
-        'protein' : "jap_glab_brachy.pep.fa",
-        'rmlib' : "PReDa_121015_short.fasta",
-        'repeat_protein' : "TE_protein_db_121015_short_header.fasta",
-        'snaphmm' : "O.sativa.hmm" } 
-
-    builder = taskBuilder.TaskBuilder("maker",
-        input_dir= config.get_option("work_dir"),
-        remote_dir="",
-        output_dir=config.get_option("output_dir"))
-    
-    option_file = "maker_opts.ctl"
-    ext = ".fasta"
-    deploy_files = []
-    
-    try:
-        if config.has_option("deploy"):
-            deploy_file = config.get_option("deploy")
-            fp = open(deploy_file)
+    print "Scheduling work"
+    if config.has_option("work_dir"):
+        path = config.get_option("work_dir")
+        tmp = os.listdir(path)
+        
+        if args.filter:
+            filters = args.filter.split()
         else:
-            logging.info("No additional files will be deployed to the server.")
-   
-        if fp:
-            deploy_files = fp.readlines()
-            full_path = os.path.abspath(deploy_file)
-            index = full_path.find(os.path.basename(full_path))
-            deploy_path = str(full_path[:index])
-            deploy_path.strip()
-            fp.close()
-    except:
-        print "The deploy file %s could not be opened." % deploy_file
-        sys.exit(1)
+            filters = []
+
+        if filters:
+            f = [filter(lambda x: x.endswith(f), tmp) for f in filters]
+            fl = []
+            map(lambda x: fl.extend(x), f)
+        else:
+            fl = tmp
+        
+        files = filter(os.path.isfile, map(lambda x : os.path.join(path, x), fl))
+
+        if not files:
+            print "No files where found."
+            sys.exit(0)
+
+        for f in files:
+            logging.info(f + " was found.")
+
+        backend.submit_work(files)
+        # TODO add a watcher
+
+
+    if args.simulate:
+        print "Simulated no instances will be running."
+    else:
+        print "Starting instances"
+        workers = config.get_option('num_instances')
+        for (provider, num_instances) in workers.iteritems():
+            backend.add_workers(provider, num_instances, script)
     
+    backend.start() 
 
-    for (idx, filename) in enumerate(os.listdir(builder.input_dir)):
-        
-        builder.add_input(filename)
-        builder.add_prehook("maker", args="-CTL")
-        builder.add_prehook("python", script="set_options.py",
-            args=[option_file, "genome", filename])
-        
-        for f in deploy_files:
-            builder.add_input(deploy_path + f, cache=True)
-       
-        full_name = os.path.basename(filename)
-        output_dir ="%s.maker.output" % full_name[:full_name.find(ext)]
-        output_file = "%s.tar.gz" % output_dir
-        
-        for (option, filename) in evidence_files.iteritems():
-            args = [option_file, option, filename]
-            builder.add_prehook("python", script="set_options.py", args=args)
-        
-        builder.add_posthook("tar",
-            args=["cvfz", output_file, output_dir])
-
-        builder.add_posthook("sleep", args="20")
-
-        builder.add_output(output_file)
-        task = builder.get_task(idx) 
-        backend.submit_work(task)
-
-    print "Waiting on work to finish"
-    while backend.running():
+    print "Work is being started"
+    while not backend.done():
         t = backend.update()
         if t:
-            print "Task %d: %s completed with return status: %d" % (t.id, t.command, t.return_status)
+            props = (t.id, t.return_status)
+            logging.info("Task %s: completed with return status %d" % props)
 
-
-    builder.cleanup()
     backend.stop()
