@@ -12,6 +12,18 @@ def get_arguments():
     parser.add_argument("command",
         help="command to be executed for each file.")
    
+    # AWS
+    parser.add_argument("-a", "--aws", dest="aws", metavar="",
+        help="number of AWS instances to use", type=int)
+
+    # Openstack
+    parser.add_argument("-o", "--openstack", dest="openstack", metavar="",
+        help="number of Openstack instances to use", type=int)
+
+    # Iplant
+    parser.add_argument("-i", "--iplant", dest="openstack", metavar="",
+        help="number of IPlant instances to use", type=int)
+    
     # General
     parser.add_argument("-w", "--workdir", metavar="",
         help="directory where work will be found")
@@ -28,26 +40,17 @@ def get_arguments():
     parser.add_argument("-f", "--file", metavar="", dest="script",
         help="script executed on instance after starting up")
     
-    parser.add_argument("--filter", metavar="",
-        help="select only files with the following extensions")
-
     parser.add_argument("-s", "--size", metavar="",
         help="size of the workers to be used")
     
+    parser.add_argument("-p", "--port", type=int, metavar="",
+        help="port that the backend runs on")
+    
+    parser.add_argument("--filter", metavar="",
+        help="select only files with the following extensions")
+
     parser.add_argument("--simulate", action="store_true",
         help="simulates the backend without any instances.")
-    
-    # AWS
-    parser.add_argument("-a", "--aws", dest="aws", metavar="",
-        help="number of AWS instances to use", type=int)
-
-    # Openstack
-    parser.add_argument("-o", "--openstack", dest="openstack", metavar="",
-        help="number of Openstack instances to use", type=int)
-
-    # Iplant
-    parser.add_argument("-i", "--iplant", dest="openstack", metavar="",
-        help="number of IPlant instances to use", type=int)
 
     return parser.parse_args()
 
@@ -56,7 +59,7 @@ def configure_settings(args, config):
     if args.deploy and os.path.isfile(os.path.abspath(args.deploy)):
         config.set_option("deploy", args.deploy)
     
-    if not args.aws and not args.openstack:
+    if not args.aws and not args.openstack and not args.simulate:
         print "Please specify the number of instances to be used."
         sys.exit(1)
     else:
@@ -72,21 +75,25 @@ def configure_settings(args, config):
     if args.results and os.path.isdir(args.results):
         config.set_option("output_dir", args.results)
 
+    if args.port:
+        config.set_option("port", args.port)
+
+    if args.config:
+        config.set_option("config", args.config)
+    else:
+        config.set_option("config", "/etc/acic.cfg")
+
 if __name__ == "__main__":
     args = get_arguments() 
-    
-    if args.config:
-        backend = backend.Backend(args.project, args.command, args.config)
-    else:
-        backend = backend.Backend(args.project, args.command, "/etc/acic.cfg")
-
-    config = backend.config_manager
+    config = configurationManager.ConfigurationManager()
     configure_settings(args, config)
-    
+    backend = backend.Backend(args.project, args.command, config)
+
     if config.has_option("startup_script"):
         startup_script = config.get_option("startup_script")
         try:
             script = open(startup_script).read()
+            script = script.replace("%PROJECT%", args.project)
         except:
             print "The startup script %s could not be opened." % startup_script
             sys.exit(1) 

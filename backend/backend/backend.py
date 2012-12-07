@@ -6,24 +6,19 @@ from taskBuilder import *
 import sys, logging
 
 class Backend(object):
-    def __init__(self, project_name, cmd, config="", port=WORK_QUEUE_DEFAULT_PORT):
+    def __init__(self, project_name, cmd, config):
         self.project_name = project_name
-        self.config_manager = ConfigurationManager()
+        self.config_manager = config
         self.connection_manager = ConnectionManager(project_name, self.config_manager)
-        self.port = port
         self.instances = {}
         self.running = False
         self.work = []
         self.scheduled = []
-        
-        if config:
-            msg  = config + ": configuration file could not be opened."
-            self.load_or_die(config, error=msg)
-        else:
-            self.load_or_die(config)
 
-        self.config_manager.set_option("project",
-            value=boto.config.get("Backend", "project"))
+        configfile = self.config_manager.get_option("config")
+        msg  = configfile + ": configuration file could not be opened."
+        self.load_or_die(configfile, error=msg)
+
         self.config_manager.set_option("work_dir",
             value=boto.config.get("Backend", "work_dir"))
         self.config_manager.set_option("output_dir",
@@ -32,7 +27,14 @@ class Backend(object):
             value=boto.config.get("Backend", "deploy"))
         self.config_manager.set_option("startup_script",
             value=boto.config.get("Backend", "startup_script"))
-    
+        
+        if not self.config_manager.has_option("port"):
+            if boto.config.has_option("Backend", "port"): 
+                self.config_manager.set_option("port",
+                    boto.config.get("Backend", "port"))
+            else:
+                self.config_manager.set_option("port", WORK_QUEUE_DEFAULT_PORT)
+        
         self.builder = TaskBuilder(cmd,
             input_dir= self.config_manager.get_option("work_dir"),
             remote_dir="",
@@ -47,13 +49,13 @@ class Backend(object):
    
     def start(self):
         self.running = True
-
+        p = int(self.config_manager.get_option("port"))
+        
         try:
-            self.queue = WorkQueue(port = self.port, name = self.project_name, catalog = True)
-            self.queue.activate_fast_abort(-1)
-            logging.info("Started Work Queue master on port %d" % self.port)
+            self.queue = WorkQueue(port = p, name = self.project_name, catalog = True)
+            logging.info("Started Work Queue master on port %d" % p)
         except:
-            logging.error("Unable to start Work Queue master.")
+            logging.error("Unable to start Work Queue master. Try another port.")
             sys.exit(1);
 
         for files in self.work:
@@ -155,22 +157,35 @@ class Backend(object):
             return
 
         scripts = filter(lambda x : x.startswith("startup:"), lines)
-        
-        if len(scripts) > 1:
-            print "Currently on 1 startup file can be specified."
-        else:
-            self.start_up = scripts[0]
-
         prehooks = filter(lambda x : x.startswith("before:"), lines)
         posthooks = filter(lambda x : x.startswith("after:"), lines)
         data = filter(lambda x : x.startswith("data:"), lines)
         results = filter(lambda x : x.startswith("result:"), lines)
         
-        scripts = map(lambda x : x.lstrip("startup:"), scripts)
-        prehooks= map(lambda x : x.lstrip("before:"), prehooks)
-        posthooks = map(lambda x : x.lstrip("after:"), posthooks)
-        data = map(lambda x : x.lstrip("data:"), data)
-        results = map(lambda x : x.lstrip("result:"), results)
+        scripts = map(lambda x : x[8:], scripts)
+        prehooks= map(lambda x : x[7:], prehooks)
+        posthooks = map(lambda x : x[6:], posthooks)
+        data = map(lambda x : x[5:], data)
+        results = map(lambda x : x[7:], results)
+        
+        if len(scripts) == 1:
+            try:
+                script_file = scripts[0].strip()
+                if os.path.isfile(script_file):
+                    fp = open(os.path.abs.path(script_file))
+                    config = fp.read()
+                else:
+                    fp = open(os.path.join(deploy_path, script_file))
+                    config = fp.read()
+
+                config = config.replace("%PROJECT%", self.project_name)
+                self.startup_script = config
+            except:
+                print "The startup script %s could not be opened." % script_file
+            finally:
+                fp.close()
+        else:
+            print "Only 1 startup file can be specified."
 
         self.builder.add_hooks(prehooks, source_dir=deploy_path)
         self.builder.add_hooks(posthooks, source_dir=deploy_path,

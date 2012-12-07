@@ -14,11 +14,12 @@ class TaskBuilder():
         self.wildcard = wildcard
         self.cur_id = 0
         
-        cmd, sep, self.args = cmdline.partition(" ")
-        cmdpath = os.path.abspath(cmd)
+        self.cmd, sep, self.args = cmdline.partition(" ")
+        cmdpath = os.path.abspath(self.cmd)
         if os.path.isfile(cmdpath):
-            self.cmd = os.path.basename(cmdpath)
             self.add_file(cmdpath) 
+        else:
+            logging.warn(self.cmd + ": will not be added as file.")
 
     def build_task(self, work_file):
         name = os.path.basename(work_file).strip()
@@ -65,7 +66,7 @@ class TaskBuilder():
                 fp.write(posthook_msg)
                 fp.write("bash %s" % cmdstring)
         except Exception as e:
-            print str(e)
+            print "Exception: " + str(e)
             logging.warn(script_name + ": task could not be written.")
             return None
         finally:
@@ -107,9 +108,9 @@ class TaskBuilder():
                     self.prehooks.append(self.append_newline(cmdstring))
                 else:
                     self.posthooks.append(self.append_newline(cmdstring))
-                logging.info(cmd + ": was successfully added for deployment.") 
+                logging.info(cmdstring + ": was successfully added for deployment.") 
             else:
-                logging.warn(cmdstring + ": will not be deployed.")
+                logging.warn(cmd + ": will not be deployed.")
     
     def add_file_group(self, files, source_dir="", remote=False):
         if not files:
