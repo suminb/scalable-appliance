@@ -178,7 +178,7 @@ def worker_info():
 
         json_response = json.dumps(response)
         r.set(key, json_response)
-        r.expire(key, 3)
+        r.expire(key, 1)
         return json_response
 
 file_suffix_to_mimetype = {

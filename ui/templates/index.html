@@ -55,78 +55,164 @@
     </div>
 
     <div class="container">
-    <h2>Graph and a half</h2>
+    <h2>CPU</h2>
     <div id="cpu"></div>
+    <div id="cpu-legend"></div>
+
+    <h2>Memory</h2>
     <div id="memory"></div>
+    <div id="memory-legend"></div>
+
+    <h2>Disk</h2>
     <div id="disk"></div>
-    <div id="legend_container">
-        <div id="smoother" title="Smoothing"></div>
-        <div id="legend"></div>
-    </div>
+    <div id="disk-legend"></div>
     </div>
 
     <script>
-    var graph = new Rickshaw.Graph( {
-        element: document.querySelector("#cpu"),
-        width: 300,
-        height: 200,
-        series: [
-        {
-            color: 'cornflowerblue',
-            data: [
-                { x: 0, y: 40 },
-                { x: 0.5, y: 44 },
-                { x: 1, y: 49 },
-                { x: 1.5, y: 53 },
-                { x: 2, y: 38 },
-                { x: 2.5, y: 38 },
-                { x: 3.0, y: 30 },
-                { x: 3.5, y: 34 },
-                { x: 4, y: 32 },
-                { x: 4.5, y: 35 } ],
-            name: 'CPU',
-        },
-        {
-            color: 'red',
-            data: [
-                { x: 0.0, y: 35 },
-                { x: 0.5, y: 32 },
-                { x: 1.0, y: 34 },
-                { x: 1.5, y: 30 },
-                { x: 2.0, y: 38 },
-                { x: 2.5, y: 38 },
-                { x: 3.0, y: 53 },
-                { x: 3.5, y: 49 },
-                { x: 4.0, y: 40 },
-                { x: 4.5, y: 44 } ],
-            name: 'Mem',
+    var palette = new Rickshaw.Color.Palette( { scheme: 'classic9' } );
+    var tv = 1000 + 250*Math.random();
+
+    // The names of the workers are needed before the graphs can be constructed
+    jQuery.getJSON('/worker_info', function(resp) {
+
+        // This is extremely sad, but I couldn't get encapuslating this to
+        // work. If someone wants to tell me the correct way, I would be very
+        // appreciative. ~Chas
+        cpuNames = [];
+        memoryNames = [];
+        diskNames = [];
+        for (var worker in resp) {
+            cpuNames.push({name: worker.split('\.')[0]});
+            memoryNames.push({name: worker.split('\.')[0]});
+            diskNames.push({name: worker.split('\.')[0]});
         }
-        ],
-        renderer: 'line',
+
+        var cpu = new Rickshaw.Graph( {
+            element: document.getElementById('cpu'),
+            width: 500,
+            height: 300,
+            renderer: 'line',
+            series: new Rickshaw.Series.FixedDuration(cpuNames, undefined, {
+                timeInterval: tv,
+                maxDataPoints: 100,
+                timeBase: new Date().getTime() / 1000
+            }),
+        } );
+        cpu.render();
+
+        var cpuLegend = new Rickshaw.Graph.Legend({
+            graph: cpu,
+            element: document.querySelector('#cpu-legend')
+        });
+
+        var cpuShelving = new Rickshaw.Graph.Behavior.Series.Toggle({
+            graph: cpu,
+            legend: cpuLegend
+        });
+
+        var cpuOrder = new Rickshaw.Graph.Behavior.Series.Order({
+            graph: cpu,
+            legend: cpuLegend
+        });
+
+        var cpuHoverDetail = new Rickshaw.Graph.HoverDetail( {
+            graph: cpu,
+            xFormatter: function(x) { return x + " s" },
+            yFormatter: function(y) { return y + "%" },
+        } );
+
+        var memory = new Rickshaw.Graph( {
+            element: document.getElementById('memory'),
+            width: 500,
+            height: 300,
+            renderer: 'line',
+            series: new Rickshaw.Series.FixedDuration(memoryNames, undefined, {
+                timeInterval: tv,
+                maxDataPoints: 100,
+                timeBase: new Date().getTime() / 1000
+            }),
+        } );
+        memory.render();
+
+        var memoryLegend = new Rickshaw.Graph.Legend({
+            graph: memory,
+            element: document.querySelector('#memory-legend')
+        });
+
+        var memoryShelving = new Rickshaw.Graph.Behavior.Series.Toggle({
+            graph: memory,
+            legend: memoryLegend
+        });
+
+        var memoryOrder = new Rickshaw.Graph.Behavior.Series.Order({
+            graph: memory,
+            legend: memoryLegend
+        });
+
+        var memoryHoverDetail = new Rickshaw.Graph.HoverDetail( {
+            graph: memory,
+            xFormatter: function(x) { return x + " s" },
+            yFormatter: function(y) { return y + "%" },
+        } );
+
+        var disk = new Rickshaw.Graph( {
+            element: document.getElementById('disk'),
+            width: 500,
+            height: 300,
+            renderer: 'line',
+            series: new Rickshaw.Series.FixedDuration(diskNames, undefined, {
+                timeInterval: tv,
+                maxDataPoints: 100,
+                timeBase: new Date().getTime() / 1000
+            }),
+        } );
+        disk.render();
+
+        var diskLegend = new Rickshaw.Graph.Legend({
+            graph: disk,
+            element: document.querySelector('#disk-legend')
+        });
+
+        var diskShelving = new Rickshaw.Graph.Behavior.Series.Toggle({
+            graph: disk,
+            legend: diskLegend
+        });
+
+        var diskOrder = new Rickshaw.Graph.Behavior.Series.Order({
+            graph: disk,
+            legend: diskLegend
+        });
+
+        var diskHoverDetail = new Rickshaw.Graph.HoverDetail( {
+            graph: disk,
+            xFormatter: function(x) { return x + " s" },
+            yFormatter: function(y) { return y + "%" },
+        } );
+
+        setInterval(function() {
+            jQuery.getJSON('/worker_info', function(resp) {
+                var cpu_usage = {}
+                var memory_usage = {}
+                var disk_usage = {}
+                for (var worker in resp) {
+                    worker_name = worker.split('\.')[0]
+                    cpu_usage[worker_name] = resp[worker].cpu['cpu-0'];
+                    memory_usage[worker_name] = resp[worker].memory_usage.percent;
+                    disk_usage[worker_name] = resp[worker].disk_usage['/dev/xvda1'].percent;
+                }
+
+                cpu.series.addData(cpu_usage);
+                cpu.render();
+
+                memory.series.addData(memory_usage);
+                memory.render();
+
+                disk.series.addData(disk_usage);
+                disk.render();
+            });
+        }, tv);
+
     });
-    graph.render();
-
-    var hoverDetail = new Rickshaw.Graph.HoverDetail( {
-        graph: graph,
-        xFormatter: function(x) { return x + " seconds" },
-        yFormatter: function(y) { return y + " percent" },
-    } );
-
-    var legend = new Rickshaw.Graph.Legend( {
-        graph: graph,
-        element: document.getElementById('legend')
-    } );
-
-    var shelving = new Rickshaw.Graph.Behavior.Series.Toggle( {
-        graph: graph,
-        legend: legend
-    } );
-
-    var axes = new Rickshaw.Graph.Axis.Time( {
-        graph: graph
-    } );
-    axes.render();
-
     </script>
 </body>
 </html>
