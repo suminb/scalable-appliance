@@ -1,9 +1,9 @@
+import grequests
 import json
 import linecache
 import os
 import subprocess
 import re
-import requests
 
 from flask import Flask, request, render_template, jsonify
 from werkzeug.contrib.fixers import ProxyFix
@@ -98,10 +98,15 @@ def register_worker():
     now = unix_timestamp()
     r.hset(key, 'created', now)
     r.hset(key, 'last_pong', now)
+    r.hset(key, 'initialized', False)
 
     PEM = os.environ.get('PEM', 'might-be-running-in-debug');
-    p = subprocess.Popen(["ssh", "-i", PEM,
-        "ubuntu@" + hostname], stdin=subprocess.PIPE)
+    # extra options disable known host additions
+    p = subprocess.Popen(['ssh', '-i', PEM,
+                                 '-o', 'UserKnownHostsFile=/dev/null',
+                                 '-o', 'StrictHostKeyChecking=no',
+                                 'ubuntu@' + hostname],
+                                 stdin=subprocess.PIPE)
     with open('remote.sh') as f:
         p.stdin.write(f.read())
 
@@ -121,6 +126,7 @@ def update_worker():
     hostname = request.form['hostname']
     r = redis.StrictRedis()
     r.hset('worker:' + hostname, 'last_pong', unix_timestamp())
+    r.hset('worker:' + hostname, 'initialized', True)
     return 'worker updated\n'
 
 @app.route('/workers')
@@ -139,23 +145,22 @@ def worker_info():
         info = r.hgetall(worker)
         _, hostname = worker.split(':')
         host_response = {}
-        for endpoint in ('os_name', 'memory_usage', 'disk_usage', 'cpu'):
-            try:
-                resp = requests.get('http://'+hostname+'/v0.9/' + endpoint)
-                if resp.status_code == 200:
-                    host_response[endpoint] = resp.json
-            except requests.ConnectionError:
-                pass
-                # kill them if they can't be reached
-                # TODO and are older than 10 minutes
-                # r.delete(worker)
+        endpoints = ('os_name', 'memory_usage', 'disk_usage', 'cpu')
+        rs = (grequests.get('http://'+hostname+'/v0.9/' + endpoint,
+            timeout=0.1) for endpoint in endpoints)
+
+        # this spews exceptions from greenlet, but is really fast, probably
+        # need to dive into gevent/greenlets to solve
+        for i, resp in enumerate(grequests.map(rs)):
+            if resp.status_code == 200:
+                host_response[endpoints[i]] = resp.json
 
         if host_response:
             if 'last_pong' in info:
-                response['last_heartbeat'] = unix_to_iso8601(
+                host_response['last_heartbeat'] = unix_to_iso8601(
                     float(info['last_pong']))
             if 'created' in info:
-                response['created'] = info['created']
+                host_response['created'] = info['created']
             response[hostname] = host_response
 
     return jsonify(response)
