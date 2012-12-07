@@ -1,0 +1,5 @@
+startup:setup-worker.sh
+before:setup-maker.sh
+after:cleanup-maker.sh
+data:setoption.py
+result:*.tar.gz
