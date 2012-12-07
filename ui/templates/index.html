@@ -17,6 +17,13 @@
     body {
     padding-top: 60px; /* 60px to make the container go all the way to the bottom of the topbar */
     }
+    .greyborder {
+        border-style: solid;
+        border-color: #eeeeee;
+        border-width: 1px;
+        width: 500px;
+        height: 300px;
+    }
 </style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="css/bootstrap-responsive.css" rel="stylesheet">
@@ -56,15 +63,15 @@
 
     <div class="container">
     <h2>CPU</h2>
-    <div id="cpu"></div>
+    <div id="cpu" class='greyborder'></div>
     <div id="cpu-legend"></div>
 
     <h2>Memory</h2>
-    <div id="memory"></div>
+    <div id="memory" class='greyborder'></div>
     <div id="memory-legend"></div>
 
     <h2>Disk</h2>
-    <div id="disk"></div>
+    <div id="disk" class='greyborder'></div>
     <div id="disk-legend"></div>
     </div>
 
