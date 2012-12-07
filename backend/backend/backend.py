@@ -62,7 +62,7 @@ class Backend(object):
             self.submit_work(files)
 
         for (provider, num_instance, user_data) in self.scheduled:
-            self.add_workers(provider, num_instances, user_data)
+            self.add_workers(provider, num_instance, user_data)
 
         del self.work
         del self.scheduled
@@ -100,8 +100,8 @@ class Backend(object):
         return self.running
 
     def add_workers(self, provider, num_instances, user_data=""):
-        if not(running):
-            self.schedule.append((provider, num_instances, user_data))
+        if not(self.running):
+            self.scheduled.append((provider, num_instances, user_data))
             return
 
         if user_data or not self.startup:
