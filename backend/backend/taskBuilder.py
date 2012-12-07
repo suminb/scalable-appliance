@@ -19,7 +19,7 @@ class TaskBuilder():
         if os.path.isfile(cmdpath):
             self.add_file(cmdpath) 
         else:
-            logging.warn(self.cmd + ": will not be added as file.")
+            logging.warn(self.cmd + ": will not be added as a file.")
 
     def build_task(self, work_file):
         name = os.path.basename(work_file).strip()
