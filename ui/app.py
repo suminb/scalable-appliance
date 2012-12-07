@@ -162,7 +162,7 @@ def worker_info():
                 urls.append(url)
                 info_list.append(info)
 
-        rs = (grequests.get(url, timeout=0.1) for url in urls)
+        rs = (grequests.get(url, timeout=0.2) for url in urls)
 
         # this spews exceptions from greenlet, but is really fast, probably
         # need to dive into gevent/greenlets to solve
