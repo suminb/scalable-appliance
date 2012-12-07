@@ -141,6 +141,8 @@ def workers():
 def worker_info():
     r = redis.StrictRedis()
     response = {}
+
+    # this whole loop could be added into the grequest for max speed
     for worker in r.keys('worker:*'):
         info = r.hgetall(worker)
         _, hostname = worker.split(':')
