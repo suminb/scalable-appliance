@@ -142,37 +142,45 @@ def workers():
 @app.route('/worker_info')
 def worker_info():
     r = redis.StrictRedis()
-    response = defaultdict(dict)
+    key = '/worker_info'
+    cache = r.get(key)
+    if cache:
+        return cache
+    else:
+        response = defaultdict(dict)
 
-    # this whole loop could be added into the grequest for max speed
-    urls = []
-    hosts = []
-    info_list = []
-    endpoints = ('os_name', 'memory_usage', 'disk_usage', 'cpu')
-    for worker in r.keys('worker:*'):
-        info = r.hgetall(worker)
-        _, hostname = worker.split(':')
-        for endpoint in endpoints:
-            url = 'http://'+hostname+'/v0.9/' + endpoint
-            hosts.append(hostname)
-            urls.append(url)
-            info_list.append(info)
+        urls = []
+        hosts = []
+        info_list = []
+        endpoints = ('os_name', 'memory_usage', 'disk_usage', 'cpu')
+        for worker in r.keys('worker:*'):
+            info = r.hgetall(worker)
+            _, hostname = worker.split(':')
+            for endpoint in endpoints:
+                url = 'http://'+hostname+'/v0.9/' + endpoint
+                hosts.append(hostname)
+                urls.append(url)
+                info_list.append(info)
 
-    rs = (grequests.get(url, timeout=0.1) for url in urls)
+        rs = (grequests.get(url, timeout=0.1) for url in urls)
 
-    # this spews exceptions from greenlet, but is really fast, probably
-    # need to dive into gevent/greenlets to solve
-    for host, info, resp, endpoint in izip(hosts, info_list, grequests.map(rs), cycle(endpoints)):
-        if resp.status_code == 200:
-            response[host][endpoint] = resp.json
+        # this spews exceptions from greenlet, but is really fast, probably
+        # need to dive into gevent/greenlets to solve
+        for host, info, resp, endpoint in izip(hosts, info_list, grequests.map(rs),
+            cycle(endpoints)):
+            if resp.status_code == 200:
+                response[host][endpoint] = resp.json
 
-            if 'last_pong' in info:
-                response[host]['last_heartbeat'] = unix_to_iso8601(
-                    float(info['last_pong']))
-            if 'created' in info:
-                response[host]['created'] = info['created']
+                if 'last_pong' in info:
+                    response[host]['last_heartbeat'] = unix_to_iso8601(
+                        float(info['last_pong']))
+                if 'created' in info:
+                    response[host]['created'] = info['created']
 
-    return jsonify(response)
+        json_response = json.dumps(response)
+        r.set(key, json_response)
+        r.expire(key, 3)
+        return json_response
 
 file_suffix_to_mimetype = {
     '.css': 'text/css',
