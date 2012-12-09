@@ -23,13 +23,13 @@ class ConnectionManager(object):
             self.connections[provider] = self.setup_provider[provider]()
         
         (instance, keypair, groups, size) =  self.config_manager.get_provider(provider)
-        print size
+        
         conn = self.connections[provider]
         res = conn.run_instances(instance, key_name=keypair,
             security_groups=groups, instance_type=size,
             max_count=num_instances, user_data=user_data)
 
-        conn.create_tags(map(lambda x: x.id, res.instances), {"Name" : self.project_name})
+        #conn.create_tags(map(lambda x: x.id, res.instances), {"Name" : self.project_name})
         return res.instances
 
     def split_groups(self, groups, delimiter=","):
@@ -63,10 +63,10 @@ class ConnectionManager(object):
         user_id = boto.config.get("Credentials", "openstack_access_key_id")
         secret_key = boto.config.get("Credentials","openstack_secret_access_key")
         connection = connect_ec2(user_id, secret_key)
-        connection.host = '149.165.146.50'
+        connection.host= '149.165.146.50'
         connection.port = 8773
         connection.is_secure = False
-        connection.path = "/setup_provider/Cloud"
+        connection.path = "/services/Cloud"
  
         instance_id = boto.config.get("Instances", "openstack_instance_id")
         keypair = boto.config.get("Instances", "openstack_instance_keypair")
