@@ -29,8 +29,10 @@ elif [[ $WORK_FILE =~ punctata ]]; then
     pred_gff=O.punctata.fg.gff3
 elif [[ $WORK_FILE =~ japonica ]]; then
     pred_gff=O.japonica.fg.gff3
-else
+elif [[ $WORK_FILE =~ indica ]]; then
     pred_gff=O.indica.fg.gff3
+else
+    echo "Nothing else needed."
 fi
 
 python setoption.py maker_opts.ctl est $est
