@@ -29,7 +29,9 @@ class ConnectionManager(object):
             security_groups=groups, instance_type=size,
             max_count=num_instances, user_data=user_data)
 
-        #conn.create_tags(map(lambda x: x.id, res.instances), {"Name" : self.project_name})
+        if provider == "aws":
+            conn.create_tags(map(lambda x: x.id, res.instances), {"Name" : self.project_name})
+
         return res.instances
 
     def split_groups(self, groups, delimiter=","):
