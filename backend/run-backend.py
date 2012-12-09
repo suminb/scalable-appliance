@@ -25,6 +25,9 @@ def get_arguments():
         help="number of IPlant instances to use", type=int)
     
     # General
+    parser.add_argument("--schedule", action="store_true",
+        help="Will only schedule more workers.")
+
     parser.add_argument("-w", "--workdir", metavar="",
         help="directory where work will be found")
 
@@ -75,6 +78,9 @@ def configure_settings(args, config):
     if args.results and os.path.isdir(args.results):
         config.set_option("output_dir", args.results)
 
+    if args.size:
+        config.set_option("size", args.size)
+
     if args.port:
         config.set_option("port", args.port)
 
@@ -104,8 +110,8 @@ if __name__ == "__main__":
         print "Adding deploy files"
         backend.deploy_files(config.get_option("deploy"))
     
-    print "Scheduling work"
-    if config.has_option("work_dir"):
+    if config.has_option("work_dir") and not args.schedule:
+        print "Scheduling work"
         path = config.get_option("work_dir")
         tmp = os.listdir(path)
         
@@ -144,11 +150,11 @@ if __name__ == "__main__":
     
     backend.start() 
 
-    print "Work is being started"
     while not backend.done():
         t = backend.update()
         if t:
             props = (t.id, t.return_status)
             logging.info("Task %s: completed with return status %d" % props)
 
-    backend.stop()
+    if not args.schedule:
+        backend.stop()
