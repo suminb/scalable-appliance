@@ -215,7 +215,7 @@
                 for (var worker in resp) {
                     worker_name = worker.split('\.')[0]
                     if (resp[worker]) {
-                        if (resp[worker].cpu['cpu-0']) {
+                        if (resp[worker].cpu && resp[worker].cpu['cpu-0']) {
                             cpu_usage[worker_name] = resp[worker].cpu['cpu-0'];
                         }
                         if (resp[worker].memory_usage &&
