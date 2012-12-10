@@ -214,9 +214,23 @@
                 var disk_usage = {}
                 for (var worker in resp) {
                     worker_name = worker.split('\.')[0]
-                    cpu_usage[worker_name] = resp[worker].cpu['cpu-0'];
-                    memory_usage[worker_name] = resp[worker].memory_usage.percent;
-                    disk_usage[worker_name] = resp[worker].disk_usage['/dev/xvda1'].percent;
+                    if (resp[worker]) {
+                        if (resp[worker].cpu['cpu-0']) {
+                            cpu_usage[worker_name] = resp[worker].cpu['cpu-0'];
+                        }
+                        if (resp[worker].memory_usage &&
+                            resp[worker].memory_usage.percent) {
+                            memory_usage[worker_name] =
+                                resp[worker].memory_usage.percent;
+                        }
+
+                        if (resp[worker].disk_usage &&
+                            resp[worker].disk_usage['/dev/xvda1'] &&
+                            resp[worker].disk_usage['/dev/xvda1'].percent) {
+                            disk_usage[worker_name] =
+                                resp[worker].disk_usage['/dev/xvda1'].percent;
+                        }
+                    }
                 }
 
                 cpu.series.addData(cpu_usage);
