@@ -1,13 +1,18 @@
+import grequests
 import json
 import linecache
+import os
 import subprocess
 import re
+import redis
 
+from collections import defaultdict
+from itertools import cycle, izip
 from flask import Flask, request, render_template, jsonify
 from werkzeug.contrib.fixers import ProxyFix
 from glob import glob
+from gevent.pywsgi import WSGIServer
 from os.path import basename, splitext
-import redis
 
 app = Flask(__name__)
 app.debug = True
@@ -64,7 +69,6 @@ def gff_ajax(gff):
 
     data['size'] = len(gff_data)
     data['gff'] = gff_data
-    data['disclaimer'] = "I have no idea what version of GFF this data is, don't trust anything you see here"
     return json.dumps(data, indent=2)
 
 @app.route('/chromosomes/<parent>')
@@ -75,10 +79,14 @@ def chromosomes(parent):
     chromos = [splitext(gff)[0] for gff in chromos_gffs]
     return render_template('chromosomes.html', parent=parent, chromosomes=chromos, gene_name=gene_name)
 
-def utc_timestamp():
-    """Return a current timestamp as ISO8601: 2012-12-25T13:45:59Z"""
+def unix_timestamp():
+    import time
+    return '%.3f' % time.time()
+
+def unix_to_iso8601(timestamp):
     import datetime
-    utc = datetime.datetime.utcnow()
+    """Return unix `timestamp` converted to ISO8601: 2012-12-25T13:45:59Z"""
+    utc = datetime.datetime.fromtimestamp(timestamp)
     return utc.strftime('%Y-%m-%dT%H:%M:%SZ')
 
 @app.route('/register_worker', methods=['POST'])
@@ -92,23 +100,38 @@ def register_worker():
 
     r = redis.StrictRedis()
     key = 'worker:' + hostname
-    now = utc_timestamp()
+    now = unix_timestamp()
     r.hset(key, 'created', now)
     r.hset(key, 'last_pong', now)
+    r.hset(key, 'initialized', False)
 
-    p = subprocess.Popen(["ssh", "-i", "/home/charlesl/monitoring-test.pem",
-        "ubuntu@" + hostname], stdin=subprocess.PIPE)
+    PEM = os.environ.get('PEM', 'might-be-running-in-debug');
+    # extra options disable known host additions
+    p = subprocess.Popen(['ssh', '-i', PEM,
+                                 '-o', 'UserKnownHostsFile=/dev/null',
+                                 '-o', 'StrictHostKeyChecking=no',
+                                 'ubuntu@' + hostname],
+                                 stdin=subprocess.PIPE)
     with open('remote.sh') as f:
         p.stdin.write(f.read())
 
     return 'worker registered\n'
+
+@app.route('/unregister_worker', methods=['POST'])
+def unregister_worker():
+    assert 'hostname' in request.form
+    hostname = request.form['hostname']
+    r = redis.StrictRedis()
+    r.delete('worker:' + hostname)
+    return 'worker unregistered\n'
 
 @app.route('/update_worker', methods=['POST'])
 def update_worker():
     assert 'hostname' in request.form
     hostname = request.form['hostname']
     r = redis.StrictRedis()
-    r.hset('worker:' + hostname, 'last_pong', utc_timestamp())
+    r.hset('worker:' + hostname, 'last_pong', unix_timestamp())
+    r.hset('worker:' + hostname, 'initialized', True)
     return 'worker updated\n'
 
 @app.route('/workers')
@@ -118,6 +141,48 @@ def workers():
     for key in r.keys('worker:*'):
         response[key] = r.hgetall(key)
     return jsonify(response)
+
+@app.route('/worker_info')
+def worker_info():
+    r = redis.StrictRedis()
+    key = '/worker_info'
+    cache = r.get(key)
+    if cache:
+        return cache
+    else:
+        response = defaultdict(dict)
+
+        urls = []
+        hosts = []
+        info_list = []
+        endpoints = ('os_name', 'memory_usage', 'disk_usage', 'cpu')
+        for worker in r.keys('worker:*'):
+            info = r.hgetall(worker)
+            _, hostname = worker.split(':')
+            for endpoint in endpoints:
+                url = 'http://'+hostname+'/v0.9/' + endpoint
+                hosts.append(hostname)
+                urls.append(url)
+                info_list.append(info)
+
+        rs = (grequests.get(url, timeout=0.2) for url in urls)
+
+        # this spews exceptions from greenlet, but is really fast, probably
+        # need to dive into gevent/greenlets to solve
+        for host, info, resp, endpoint in izip(hosts, info_list, grequests.map(rs),
+            cycle(endpoints)):
+            if resp.status_code == 200:
+                response[host][endpoint] = resp.json
+                if 'last_pong' in info:
+                    response[host]['last_heartbeat'] = unix_to_iso8601(
+                        float(info['last_pong']))
+                if 'created' in info:
+                    response[host]['created'] = info['created']
+
+        json_response = json.dumps(response)
+        r.set(key, json_response)
+        r.expire(key, 1)
+        return json_response
 
 file_suffix_to_mimetype = {
     '.css': 'text/css',
@@ -147,7 +212,8 @@ def static_serve(path):
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
 if __name__ == '__main__':
-    import os
     host = os.environ.get('HOST', '127.0.0.1')
     port = int(os.environ.get('PORT', 80))
-    app.run(host=host, port=port)
+    http = WSGIServer((host, port), app)
+    print 'Listening on %s:%d' % (host, port)
+    http.serve_forever()

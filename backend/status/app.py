@@ -3,6 +3,9 @@ from werkzeug.exceptions import default_exceptions
 from werkzeug.exceptions import HTTPException
 import psutil
 import subprocess
+import os
+
+import config
 
 # http://flask.pocoo.org/snippets/83/
 def make_json_app(import_name, **kwargs):
@@ -47,7 +50,7 @@ def version():
 
 @app.route('/v0.9/os_name')
 def os_name():
-    return subprocess.check_output(("uname", "-a")) 
+    return jsonify({'os_name':subprocess.check_output(("uname", "-a"))})
 
 @app.route('/v0.9/cpu')
 def cpu():
@@ -87,6 +90,14 @@ def disk_usage():
             'percent': usage.percent
         }
     return jsonify(status)
+
+@app.route('/v0.9/worker_status')
+def worker_status():
+    if os.path.exists(config.WORKER_LOG):
+        log = subprocess.check_output(("tail", "-n %d" % config.TAIL_LINES, config.WORKER_LOG))
+        return jsonify(log=log)
+    else:
+        return jsonify(status='worker.log file does not exist.')
 
 if __name__ == '__main__':
     import os

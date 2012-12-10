@@ -14,8 +14,9 @@ class ConfigurationManager(object):
         else:
             return None
     
-    def set_option(self, option, value=''):
-        self.options[option] = value
+    def set_option(self, option, value):
+        if value:
+            self.options[option] = value
     
     def empty(self):
         return bool(self.providers)
