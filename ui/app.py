@@ -4,14 +4,15 @@ import linecache
 import os
 import subprocess
 import re
+import redis
 
 from collections import defaultdict
 from itertools import cycle, izip
 from flask import Flask, request, render_template, jsonify
 from werkzeug.contrib.fixers import ProxyFix
 from glob import glob
+from gevent.pywsgi import WSGIServer
 from os.path import basename, splitext
-import redis
 
 app = Flask(__name__)
 app.debug = True
@@ -209,7 +210,8 @@ def static_serve(path):
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
 if __name__ == '__main__':
-    import os
     host = os.environ.get('HOST', '127.0.0.1')
     port = int(os.environ.get('PORT', 80))
-    app.run(host=host, port=port)
+    http = WSGIServer((host, port), app)
+    print 'Listening on %s:%d' % (host, port)
+    http.serve_forever()
