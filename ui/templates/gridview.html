@@ -36,9 +36,14 @@
     </div> <!-- /container -->
 
     <script type="text/javascript">
+
+    function jbrowseLinkFormatter(row, cell, value, columnDef, dataContext) {
+        return '<a href="http://acic2012.iplantcollaborative.org/jbrowse/index.html?data=data/obarthii&loc=' + value + ':' + dataContext['start'] + '..' + dataContext['end'] + '">' + value + '</a>';
+    }
+
     var grid;
     var columns = [
-        {id: "seqname", name: "Seqname", field: "seqname"},
+        {id: "seqid", name: "Seqname", field: "seqid", formatter: jbrowseLinkFormatter},
         {id: "feature", name: "feature", field: "feature"},
         {id: "type", name: "Type", field: "type"},
         {id: "start", name: "Start", field: "start"},
@@ -55,36 +60,10 @@
     };
 
     $(function () {
-        var data = [
-        {
-            seqname: "chr12",
-            feature: "repeat",
-            type: "DTC",
-            start: 118026,
-            end: 118190,
-            score: 63.64,
-            strand: "-",
-            phase: ".",
-            attributes: "DTC_gnl_PTREP_PTREP80",
-        },
-        { seqname: "chr12", feature: "repeat", type: "RIL", start: 125712, end:
-        1126566, score: 22.88, strand: "+", phase: ".", attributes:
-        "RIL_gi_21686921_gb_AAK71569.2_AC087852_29", }, { seqname: "chr12", feature:
-        "repeat", type: "RIL", start: 126093, end: 126842, score: 22.4, strand: "+",
-        phase: ".", attributes: "RIL_gi_21686921_gb_AAK71569.2_AC087852_29", }, {
-        seqname: "chr12", feature: "repeat", type: "RIL", start: 126114, end: 126968,
-        score: 26.83, strand: "+", phase: ".", attributes:
-        "RIL_gi_21686921_gb_AAK71569.2_AC087852_29", }, ];
-
-        grid = new Slick.Grid("#myGrid", data, columns, options);
-
-        /* //needs more!
-        $.getJson('/gff/asdf').success(function(resp) {
-            console.log('gotten!', resp);
-        }).error(function() {
-            console.log("ERROR");
+        $.getJSON('/gff/{{gff}}', function (data) {
+            grid = new Slick.Grid('#myGrid', data.gff, columns, options);
         });
-        */
+
     })
     </script>
     <script src="/js/bootstrap.min.js"></script>
