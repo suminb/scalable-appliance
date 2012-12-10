@@ -13,6 +13,7 @@ python setoption.py maker_opts.ctl rmlib $rmlib
 python setoption.py maker_opts.ctl repeat_protein $repeat_protein
 python setoption.py maker_opts.ctl snaphmm $snaphmm
 python setoption.py maker_opts.ctl genome $WORK_FILE
+python setoption.py maker_opts.ctl cpus `grep -c "^processor" /proc/cpuinfo`
 
 if [[ $WORK_FILE =~ barthii ]]; then
     est=O.barthii_trinity_merged.fasta
