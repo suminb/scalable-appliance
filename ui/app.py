@@ -23,10 +23,11 @@ def index():
 
 @app.route('/gridview/<gff>')
 def gridview(gff):
+    gene_name = gff.replace('.','').lower()
     full_gff = glob('/proj_data/gff/'+ gff + '.gff')
     if (len(full_gff)):
         full_gff = full_gff[0]
-    return render_template('gridview.html', gff=gff, full_gff=full_gff)
+    return render_template('gridview.html', gff=gff, full_gff=full_gff, gene_name=gene_name)
 
 @app.route('/gff/<gff>')
 def gff_ajax(gff):
