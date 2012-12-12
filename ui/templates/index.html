@@ -139,6 +139,18 @@
             yFormatter: function(y) { return y + "%" },
         } );
 
+        var cpuyAxis = new Rickshaw.Graph.Axis.Y({
+                graph: cpu
+        });
+
+        cpuyAxis.render();
+
+        var cpuxAxis = new Rickshaw.Graph.Axis.Time({
+                graph: cpu
+        });
+
+        cpuxAxis.render();
+
         var memory = new Rickshaw.Graph( {
             element: document.getElementById('memory'),
             width: 500,
@@ -173,6 +185,18 @@
             yFormatter: function(y) { return y + "%" },
         } );
 
+        var memoryyAxis = new Rickshaw.Graph.Axis.Y({
+                graph: memory
+        });
+
+        memoryyAxis.render();
+
+        var memoryxAxis = new Rickshaw.Graph.Axis.Time({
+                graph: memory
+        });
+
+        memoryxAxis.render();
+
         var disk = new Rickshaw.Graph( {
             element: document.getElementById('disk'),
             width: 500,
@@ -206,6 +230,18 @@
             xFormatter: tsToTime,
             yFormatter: function(y) { return y + "%" },
         } );
+
+        var diskyAxis = new Rickshaw.Graph.Axis.Y({
+                graph: disk
+        });
+
+        diskyAxis.render();
+
+        var diskxAxis = new Rickshaw.Graph.Axis.Time({
+                graph: disk
+        });
+
+        diskxAxis.render();
 
         setInterval(function() {
             jQuery.getJSON('/worker_info', function(resp) {
