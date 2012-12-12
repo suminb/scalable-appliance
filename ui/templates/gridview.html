@@ -18,6 +18,7 @@
 <script src="/SlickGrid/lib/jquery.event.drag-2.0.min.js"></script>
 <script src="/SlickGrid/slick.core.js"></script>
 <script src="/SlickGrid/slick.grid.js"></script>
+<script src="/SlickGrid/slick.dataview.js"></script>
 
 <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
 <!--[if lt IE 9]>
@@ -42,16 +43,17 @@
     }
 
     var grid;
+    var dataView;
     var columns = [
-        {id: "seqid", name: "Seqname", field: "seqid", formatter: jbrowseLinkFormatter},
-        {id: "feature", name: "feature", field: "feature"},
-        {id: "type", name: "Type", field: "type"},
-        {id: "start", name: "Start", field: "start"},
-        {id: "end", name: "End", field: "end"},
-        {id: "score", name: "Score", field: "score"},
-        {id: "strand", name: "Strand", field: "strand"},
-        {id: "phase", name: "phase", field: "phase"},
-        {id: "attributes", name: "attributes", field: "attributes"},
+        {id: "seqid", name: "Seqname", field: "seqid", sortable: true, formatter: jbrowseLinkFormatter},
+        {id: "feature", name: "feature", field: "feature", sortable: true},
+        {id: "type", name: "Type", field: "type", sortable: true},
+        {id: "start", name: "Start", field: "start", sortable: true},
+        {id: "end", name: "End", field: "end", sortable: true},
+        {id: "score", name: "Score", field: "score", sortable: true},
+        {id: "strand", name: "Strand", field: "strand", sortable: true},
+        {id: "phase", name: "phase", field: "phase", sortable: true},
+        {id: "attributes", name: "attributes", field: "attributes", sortable: true},
     ];
 
     var options = {
@@ -59,9 +61,46 @@
         enableColumnReorder: false
     };
 
+    function comparer(a, b) {
+        var x = a[sortcol], y = b[sortcol];
+        return (x == y ? 0 : (x > y ? 1 : -1));
+    }
+
     $(function () {
         $.getJSON('/gff/{{gff}}', function (data) {
-            grid = new Slick.Grid('#myGrid', data.gff, columns, options);
+            dataView = new Slick.Data.DataView();
+            dataView.beginUpdate();
+            dataView.setItems(data.gff);
+            dataView.endUpdate();
+            grid = new Slick.Grid('#myGrid', dataView, columns, options);
+
+	    grid.onSort.subscribe(function (e, args) {
+		    sortdir = args.sortAsc ? 1 : -1;
+		    sortcol = args.sortCol.field;
+
+		    if ($.browser.msie && $.browser.version <= 8) {
+			    // using temporary Object.prototype.toString override
+			    // more limited and does lexicographic sort only by default, but can be much faster
+
+			    // use numeric sort of % and lexicographic for everything else
+			    dataView.fastSort(sortcol, args.sortAsc);
+		    } else {
+			    // using native sort with comparer
+			    // preferred method but can be very slow in IE with huge datasets
+			    dataView.sort(comparer, args.sortAsc);
+		    }
+	    });
+
+            dataView.onRowCountChanged.subscribe(function (e, args) {
+                grid.updateRowCount();
+                grid.render();
+            });
+
+            dataView.onRowsChanged.subscribe(function (e, args) {
+                grid.invalidateRows(args.rows);
+                grid.render();
+            });
+
         });
 
     })

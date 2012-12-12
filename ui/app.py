@@ -54,6 +54,7 @@ def gff_ajax(gff):
             (seqid, feature, type, start, end, score,
             strand, phase, attributes) = line.split('\t')
             gff_data.append({
+                'id': i,
                 'seqid': seqid,
                 'feature': feature,
                 'type': type,
