@@ -39,7 +39,7 @@
     <script type="text/javascript">
 
     function jbrowseLinkFormatter(row, cell, value, columnDef, dataContext) {
-        return '<a href="http://acic2012.iplantcollaborative.org/jbrowse/index.html?data=data/{{gene_name}}&loc=' + value + ':' + dataContext['start'] + '..' + dataContext['end'] + '">' + value + '</a>';
+        return '<a href="http://acic2012.iplantcollaborative.org/jbrowse/index.html?data=data/{{gene_name}}&tracks=DNA%2CMAKER&loc=' + value + ':' + dataContext['start'] + '..' + dataContext['end'] + '">' + value + '</a>';
     }
 
     var grid;
