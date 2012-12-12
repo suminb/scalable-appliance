@@ -37,6 +37,12 @@ def make_json_app(import_name, **kwargs):
 app = make_json_app(__name__)
 app.secret_key = '74dc916419a178d22cb0fc8a04f62d345784ad7d'
 
+def make_json_response(code, message):
+    response = jsonify(message=str(message))
+    response.status_code = code
+
+    return response
+
 @app.route('/')
 def index():
     return jsonify(latest_version='0.9', support_versions=['0.9'])
@@ -116,19 +122,27 @@ def worker_status():
         log = subprocess.check_output(("tail", "-n %d" % config.TAIL_LINES, log_file_path))
         return jsonify(worker_log=log, workers=workers)
     else:
-        return jsonify(status='worker.log file does not exist.')
+        return make_json_response(code=404, message='worker.log file does not exist.')
 
 @app.route('/v0.9/log/<worker_name>/<file_name>')
 def tail(worker_name, file_name):
-    # TODO: This may lead to some security vulnerabilities
+    # This may lead to some security vulnerabilities
     file_path = os.path.join(config.WORKER_BASE_DIR, worker_name, file_name)
 
-    if os.path.exists(file_path):
-        log = subprocess.check_output(("tail", "-n %d" % config.TAIL_LINES, file_path))
+    # So we normalize the path
+    file_path = os.path.normpath(file_path)
 
-        return jsonify(log=log)
+    # And check if the path has the desired prefix
+    if not file_path.startswith(config.WORKER_BASE_DIR):
+        return make_json_response(code=403, message='Operation not permitted.')
     else:
-        return jsonify(status='Requested log file does not exist.')
+        print file_path
+        if os.path.exists(file_path):
+            log = subprocess.check_output(("tail", "-n %d" % config.TAIL_LINES, file_path))
+
+            return jsonify(log=log)
+        else:
+            return make_json_response(code=404, message='Requested log file does not exist.')
 
 if __name__ == '__main__':
     import os
