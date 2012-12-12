@@ -104,12 +104,17 @@ class Backend(object):
             self.scheduled.append((provider, num_instances, user_data))
             return
 
+        if self.config_manager.has_option("size"):
+            size=self.config_manager.get_option("size")
+        else:
+            size=''
+
         if user_data or not self.startup:
             instances = self.connection_manager.spawn_workers(provider,
-                num_instances, user_data)
+                num_instances, user_data, size=size)
         else:
             instances = self.connection_manager.spawn_workers(provider,
-                num_instances, self.startup)
+                num_instances, self.startup, size=size)
 
         if not instances:
             return

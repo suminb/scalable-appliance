@@ -14,8 +14,10 @@ class TaskBuilder():
         self.wildcard = wildcard
         self.cur_id = 0
         
-        self.cmd, sep, self.args = cmdline.partition(" ")
-        cmdpath = os.path.abspath(self.cmd)
+        cmd, sep, self.args = cmdline.partition(" ")
+        cmdpath = os.path.abspath(cmd)
+        self.cmd = os.path.basename(cmd)
+        
         if os.path.isfile(cmdpath):
             self.add_file(cmdpath) 
         else:

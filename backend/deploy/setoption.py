@@ -10,12 +10,13 @@ def set_option(filename, option, value=""):
 
         for line in cleaned:
             split_line = line.split("=")
+            split_line = map(lambda x: x.strip(), split_line)
             if not line.endswith("\n"):
                 line = line + "\n"
 
             if split_line[0] == option:
-                split_line[1] = value
                 split_line.insert(1, "=")
+                split_line.insert(2, value)
                 if split_line[2].endswith("\n"):
                     fp.write("".join(split_line[0:3]) + "\n")
                 else: 

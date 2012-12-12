@@ -4,7 +4,9 @@ from werkzeug.exceptions import HTTPException
 import psutil
 import subprocess
 import os
+import re
 
+# Configuration file
 import config
 
 # http://flask.pocoo.org/snippets/83/
@@ -93,11 +95,40 @@ def disk_usage():
 
 @app.route('/v0.9/worker_status')
 def worker_status():
-    if os.path.exists(config.WORKER_LOG):
-        log = subprocess.check_output(("tail", "-n %d" % config.TAIL_LINES, config.WORKER_LOG))
-        return jsonify(log=log)
+    log_file_path = os.path.join(config.WORKER_BASE_DIR, config.WORKER_LOG)
+    if os.path.exists(log_file_path):
+        workers = []
+
+        # FIXME: Poor code readability
+        worker_dirs = filter(lambda x: re.match(r'worker-\d+-\d+', x), [m for m in os.listdir(config.WORKER_BASE_DIR)])
+
+        for dir_name in worker_dirs:
+            worker_dir = os.path.join(config.WORKER_BASE_DIR, dir_name)
+            files = [m for m in os.listdir(worker_dir)]
+
+            worker_info = {
+                'base_path': worker_dir,
+                'files': files,
+            }
+
+            workers.append(worker_info)
+
+        log = subprocess.check_output(("tail", "-n %d" % config.TAIL_LINES, log_file_path))
+        return jsonify(worker_log=log, workers=workers)
     else:
         return jsonify(status='worker.log file does not exist.')
+
+@app.route('/v0.9/log/<worker_name>/<file_name>')
+def tail(worker_name, file_name):
+    # TODO: This may lead to some security vulnerabilities
+    file_path = os.path.join(config.WORKER_BASE_DIR, worker_name, file_name)
+
+    if os.path.exists(file_path):
+        log = subprocess.check_output(("tail", "-n %d" % config.TAIL_LINES, file_path))
+
+        return jsonify(log=log)
+    else:
+        return jsonify(status='Requested log file does not exist.')
 
 if __name__ == '__main__':
     import os

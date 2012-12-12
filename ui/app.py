@@ -28,10 +28,11 @@ def index():
 
 @app.route('/gridview/<gff>')
 def gridview(gff):
+    gene_name = gff.replace('.','').lower()
     full_gff = glob('/proj_data/gff/'+ gff + '.gff')
     if (len(full_gff)):
         full_gff = full_gff[0]
-    return render_template('gridview.html', gff=gff, full_gff=full_gff)
+    return render_template('gridview.html', gff=gff, full_gff=full_gff, gene_name=gene_name)
 
 @app.route('/gff/<gff>')
 def gff_ajax(gff):
@@ -72,10 +73,11 @@ def gff_ajax(gff):
 
 @app.route('/chromosomes/<parent>')
 def chromosomes(parent):
+    gene_name = parent.replace('.','').lower()
     chromos_gffs = (basename(chromosome) for chromosome
         in glob('/proj_data/chromosomes/%s*.fasta' % parent))
     chromos = [splitext(gff)[0] for gff in chromos_gffs]
-    return render_template('chromosomes.html', parent=parent, chromosomes=chromos)
+    return render_template('chromosomes.html', parent=parent, chromosomes=chromos, gene_name=gene_name)
 
 def unix_timestamp():
     import time
