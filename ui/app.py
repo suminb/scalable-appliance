@@ -28,8 +28,7 @@ def index():
 
 @app.route('/gridview/<gff>')
 def gridview(gff):
-    gene_name = gff.replace('.','').lower()
-    gene_name = re.sub(r'[Cc]hr\d+$', '', gene_name)
+    gene_name = ''.join(gff.split('.', 2)[:2]).lower()
     full_gff = glob('/proj_data/gff/'+ gff + '.gff')
     if (len(full_gff)):
         full_gff = full_gff[0]
@@ -75,8 +74,7 @@ def gff_ajax(gff):
 
 @app.route('/chromosomes/<parent>')
 def chromosomes(parent):
-    gene_name = parent.replace('.','').lower()
-    gene_name = re.sub(r'[Cc]hr\d+$', '', gene_name)
+    gene_name = ''.join(parent.split('.', 2)[:2]).lower()
     chromos_gffs = (basename(chromosome) for chromosome
         in glob('/proj_data/chromosomes/%s*.fasta' % parent))
     chromos = [splitext(gff)[0] for gff in chromos_gffs]
